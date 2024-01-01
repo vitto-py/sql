@@ -249,3 +249,41 @@ from (
 | hr  | min  | sec    |
 |-----|------|--------|
 | 48  | 2880 | 172800 |
+
+** Determining the Date Difference Between the Current Record and the Next Record
+See SUM () OVER () in @sql-workingNumbers.org, we can use a
+old friend: LEAD(), which can be translated as SHIFT,
+shift all records by -1
+#+begin_src sql
+SELECT
+  x.*,
+  -- SQL server uses DATEDIFF(x.next_hiredate, x.hiredate, day)
+  x.next_hiredate - x.hiredate AS diff
+FROM (
+  SELECT
+    e.deptno,
+    e.ename,
+    e.hiredate,
+	-- shift -1 the column hiredate
+    LEAD(hiredate,1) OVER (ORDER BY hiredate) AS next_hiredate
+  FROM emp e
+) x;
+
+#+end_src
+Result
+| deptno | ename  |   hiredate | next_hiredate | diff |
+|--------+--------+------------+---------------+------|
+|     20 | SMITH  | 2005-12-17 |    2006-02-20 |   65 |
+|     30 | ALLEN  | 2006-02-20 |    2006-02-22 |    2 |
+|     30 | WARD   | 2006-02-22 |    2006-04-02 |   39 |
+|     20 | JONES  | 2006-04-02 |    2006-05-01 |   29 |
+|     30 | BLAKE  | 2006-05-01 |    2006-06-09 |   39 |
+|     10 | CLARK  | 2006-06-09 |    2006-09-08 |   91 |
+|     30 | TURNER | 2006-09-08 |    2006-09-28 |   20 |
+|     30 | MARTIN | 2006-09-28 |    2006-11-17 |   50 |
+|     10 | KING   | 2006-11-17 |    2006-12-03 |   16 |
+|     20 | FORD   | 2006-12-03 |    2006-12-03 |    0 |
+|     30 | JAMES  | 2006-12-03 |    2007-01-23 |   51 |
+|     10 | MILLER | 2007-01-23 |    2007-12-09 |  320 |
+|     20 | SCOTT  | 2007-12-09 |    2008-01-12 |   34 |
+|     20 | ADAMS  | 2008-01-12 |               |      |
