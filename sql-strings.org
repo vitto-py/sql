@@ -1,0 +1,491 @@
+#+title: Sql Tutorial
+
+* Advance Search SQL
+Keep in mind that SQL is not designed to perform complex string manipulation
+this primary use the TRANSLATE and REPLACE functions
+
+mySQL does not have the TRANSLATE function
+
+* Walking trough a STRING
+You want to traverse a string to return each character as a row, but SQL lacks a loop
+operation.
+| display |
+|---------|
+| K       |
+| I       |
+| N       |
+| G       |
+
+**Generate a Recursive Table**
+
+#+BEGIN_SRC sql
+-- Create index table
+CREATE TABLE T10 (
+    pos INT
+);
+-- Use a recursive query to generate numbers from 1 to 10
+WITH RECURSIVE number_sequence AS (
+    SELECT 1 AS pos
+    UNION ALL
+    SELECT pos + 1
+    FROM number_sequence
+    WHERE pos < 10
+)
+
+-- insert into t10
+INSERT INTO T10
+SELECT pos FROM number_sequence;
+#+END_SRC
+
+#+BEGIN_SRC sql
+-- Function
+SELECT SUBSTR(col_name, start_pos, number_of_characters) --number of char is optional default = until the end
+#+END_SRC
+
+The table T10 can be combined with SUBSTR() function to walk through the STRING, T10 must be used on **start_pos**
+and number_of_char = 1, to obtain
+1. SUBSTR('KING', 1 , 1) = 'K'
+2. SUBSTR('KING', 2 , 1) = 'I'
+3. SUBSTR('KING', 3 , 1) = 'N'
+4. SUBSTR('KING', 4 , 1) = 'G'
+
+The iterator is the number on the second argument, T10 must be this number
+But how we join 2 unrelated tables?
+** Cartesian Product
+#+begin_src sql
+SELECT SUBTRING(e.ename, iter.id, 1) as
+-- TWO TABLES e AND iter, just smashed together
+FROM (select ename from emp where ename = 'KING') e, (select id as pos from t10) iter
+WHERE iter.pos <= len(e.ename) -- very necessary, there are not more characters beyond
+#+end_src
+
+* Quotes ''
+One to get one quote in SQL you need to put '' double quotes
+#+begin_src sql
+-- the t1 is there because you need a table in sql
+Select '''' as one_quote
+from t1
+#+end_src
+** Result
+| one_quote |
+|-----------|
+| '         |
+Only a single quote,
+   - 'strings go inside quotes'
+   - '' = 1 quote symbol
+   - '''' = one quote symbol
+* Counting the Occurrences of a Character in a String
+Subtract the length of the string without the commas from the original length of the
+string to determine the number of commas in the string. Then divide for the length of your char.
+Example
+
+#+begin_src sql
+select
+-- (11 - 7)/2 = 4/2 = 2 (correct answer)
+(length('HELLO HELLO') - length(replace('HELLO HELLO','LL','')))/length('LL') as correct_cnt,
+-- (11 - 7) = 4 (incorrect answer)
+(length('HELLO HELLO') - length(replace('HELLO HELLO','LL',''))) as incorrect_cnt
+from T10 where T10.pos = 1 --only one row is needed
+#+end_src
+** Result
+| correct_cnt | incorrect_cnt |
+|-------------+---------------|
+|           2 |             4 |
+
+* Translate and Replace Power
+Remove all zeros and vowels
+#+begin_quote
+**Translate**: Char-wise manipulation
+    - translate('string_input', 'Characters_to_replace', 'For_this_characters')
+**Replace**: String-Wise manipulation
+    - replace('string_input', 'this_phrase', 'for_this_other')
+#+end_quote
+
+** Replace every vowel
+#+begin_src sql
+select
+-- natural state
+ename,
+-- without vowels
+replace(translate(ename,'AEIOU','aaaaa'),'a','') as stripped1,
+-- natural state
+ sal,
+-- without 0
+replace(cast(sal as char(4)),'0','') as stripped2
+from emp
+#+end_src
+
+*** Result
+| ename  | stripped1 |  sal | stripped2 |
+|--------+-----------+------+-----------|
+| SMITH  | SMTH      |  800 |         8 |
+| ALLEN  | LLN       | 1600 |        16 |
+| WARD   | WRD       | 1250 |       125 |
+| JONES  | JNS       | 2975 |      2975 |
+| MARTIN | MRTN      | 1250 |       125 |
+| BLAKE  | BLK       | 2850 |       285 |
+| CLARK  | CLRK      | 2450 |       245 |
+| SCOTT  | SCTT      | 3000 |         3 |
+| KING   | KNG       | 5000 |         5 |
+| TURNER | TRNR      | 1500 |        15 |
+| ADAMS  | DMS       | 1100 |        11 |
+| JAMES  | JMS       |  950 |        95 |
+| FORD   | FRD       | 3000 |         3 |
+| MILLER | MLLR      | 1300 |        13 |
+
+** Separating Numeric and Character Data
+You want to separate the character data from the numeric data. Consider the following result set
+| DATA       |
+|------------|
+| SMITH800   |
+| ALLEN1600  |
+| WARD1250   |
+| JONES2975  |
+| MARTIN1250 |
+| BLAKE2850  |
+| CLARK2450  |
+| SCOTT3000  |
+| KING5000   |
+| TURNER1500 |
+| ADAMS1100  |
+| JAMES950   |
+| FORD3000   |
+| MILLER1300 |
+#+begin_src sql
+create view V as
+select ename || sal as alphanum from emp
+#+end_src
+
+To separate character and numbers use Translate and Replace,
+The trick is to REPLACE for '' (nothing) the part you don't want
+
+TRANSLATE(row, '0123456789', '00000000000') => this takes out all the numbers for 0
+Now REPLACE(result_row_before, '0', '') => will replace every zero for nothing
+
+#+begin_quote
+But what happen with the chars? how to isolate them, there a many many posibilities, hence, the best is to isolate the numbers, take them out and pass this to a new REPLACE, but as second argument, this will remove THOSE character from the original text
+REPLACE(original_text, allchars, '')
+How to isolate allchars? you did it above! look, just pass that as a second argument
+#+end_quote
+
+Let's apply
+into the code
+
+#+begin_src sql
+-- pay attention to onlychar, the same code is supplied as a second argument on the replace of onlynum
+SELECT alphanum original,
+REPLACE(TRANSLATE(alphanum, '0123456789', '0000000000'),'0','') onlychar,
+REPLACE(alphanum,REPLACE(TRANSLATE(alphanum, '0123456789', '0000000000'),'0',''), '') onlynum
+FROM V
+#+end_src
+
+** Filter out rows
+You want to return rows from a table only when a column of interest contains no
+characters other than numbers and letters.
+
+| id | DATA            |
+|----+-----------------|
+| 1  | CLARK           |
+| 2  | KING            |
+| 3  | MILLER          |
+| 4  | SMITH, $800.00  |
+| 5  | JONES, $2975.00 |
+| 6  | SCOTT, $3000.00 |
+| 7  | ADAMS, $1100.00 |
+| 8  | FORD, $3000.00  |
+| 9  | ALLEN30         |
+| 10 | WARD30          |
+| 11 | MARTIN30        |
+| 12 | BLAKE30         |
+| 13 | TURNER30        |
+| 14 | JAMES30         |
+
+The rows (4,5,6,7,8) must me filter out
+
+To use the , is a mistake, some other special chars might appear
+
+#+begin_src sql
+-- create the dataset
+DROP VIEW IF EXISTS V;
+create view V as
+select ename as data
+from emp
+where deptno=10
+union all
+select ename||', $'|| cast(sal as char(4)) ||'.00' as data
+from emp
+where deptno=20
+union all
+select ename|| cast(deptno as char(4)) as data
+from emp
+where deptno=30;
+#+end_src
+
+**How to solve this?**
+Here the solution, a simple comparation
+| DATA           | TRANSLATED     | FIXED            |
+|----------------+----------------+------------------|
+| CLARK          | aaaaa          | aaaaa            |
+| SMITH, $800.00 | aaaaa, $aaa.aa | aaaaaaaaaaaaaaaa |
+| ALLEN30        | aaaaaaa        | aaaaaaa          |
+
+look, those whose columns TRANSLATED and FIXED are equal are correct
+
+#+begin_src sql
+select data as original,
+translate(lower(data),'0123456789abcdefghijklmnopqrstuvwxyz',rpad('a',36,'a')) as Translated,
+rpad('a', length(data), 'a') as Fixed
+from V
+where translate(lower(data),'0123456789abcdefghijklmnopqrstuvwxyz',rpad('a',36,'a'))
+= rpad('a', length(data), 'a')
+#+end_src
+
+
+* REGEX
+**Analyze this**
+
+regexp_like(text, '[0-9]{3}[-. ][0-9]{3}[-. ][0-9]{4}')
+
+This function gets 2 arguments the text and the regex pattern, returns TRUE/FALSE. It returns TRUE if the regular expression pattern is found in the string, and FALSE otherwise
+
+**Example**
+#+begin_src sql
+SELECT column_name
+FROM table_name
+WHERE REGEXP_LIKE(column_name, 'pattern');
+#+end_src
+
+*** 'pattern':
+    - Simple Text Match:
+        pattern: "apple"
+        Matches the exact string "apple" in the text.
+
+    - Case-Insensitive Match:
+        pattern: "(?i)apple"
+        Case-insensitive match for "apple".
+
+    - Matching Digits:
+        pattern: "\d"
+        Matches any digit (0-9).
+
+    - Matching Word Characters:
+        pattern: "\w"
+        Matches any word character (alphanumeric + underscore).
+
+    - Matching Non-Word Characters:
+        pattern: "\W"
+        Matches any non-word character.
+
+    - Matching Whitespace:
+        pattern: "\s"
+        Matches any whitespace character (space, tab, newline).
+
+    - Matching Repetitions:
+        pattern: "a{3}"
+        Matches exactly three consecutive 'a' characters.
+
+    - Matching Non-WhiteSpace
+        pattern: "\S"
+        matches any character that is not a whitespace character.
+
+    - Matching Start of Line:
+        pattern: "^start"
+        Matches "start" only if it appears at the start of a line.
+
+    - Matching End of Line:
+        pattern: "end$"
+        Matches "end" only if it appears at the end of a line.
+
+    - Matching One of Several Options:
+        pattern: "cat|dog"
+        Matches either "cat" or "dog".
+
+    - Matching Anything:
+        pattern: ".*"
+      1. ".:" This matches any single character except for a newline. It's like a wildcard that can represent any character.
+      2. "*:" This is a quantifier that specifies "zero or more occurrences" of the preceding element, in this case, the dot (.). It allows for matching any sequence of characters, including an empty sequence (zero characters).
+        When combined, .* essentially means "match zero or more of any character."
+
+    - The subtle difference between "+" and "*"
+        1. * allows for zero or more occurrences.
+        2. + requires one or more occurrences
+        Examples
+            + a*: Matches an empty string, "a," "aa," "aaa," and so on.
+            + a+: Matches "a," "aa," "aaa," and so on, **but not** an empty string
+
+    - Matching URLs:
+        pattern: "https?://\S+"
+        Matches HTTP or HTTPS URLs.
+
+    - Matching Dates (YYYY-MM-DD):
+        pattern: "\d{4}-\d{2}-\d{2}"
+        Matches dates in the format YYYY-MM-DD.
+
+    - Matching Phone Numbers:
+        pattern: "\d{3}-\d{3}-\d{4}"
+        Matches phone numbers in the format ###-###-####.
+
+    - Matching Hexadecimal Colors:
+        pattern: "#[0-9A-Fa-f]{6}"
+        Matches hexadecimal color codes.
+
+    - Matching Optional Character:
+        pattern: "colou?r"
+        Matches both "color" and "colour".
+
+    - Matching Email Addresses:
+        pattern: "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+        Matches a basic pattern for email addresses.
+
+** Possible phone number
+Lets first create the dataset
+ s
+#+begin_src sql
+CREATE TABLE employee_comment (
+    EMP_ID INT,
+    COMMENT_TEXT VARCHAR(150)
+);
+
+INSERT INTO employee_comment (EMP_ID, COMMENT_TEXT) VALUES
+('7369', '126 Varnum, Edmore MI 48829, 989 313-5351'),
+('7844', '989-387.5359'),
+('9999', '906-387-1698, 313-535.8886'),
+('1234', '456 Main St, Anytown, USA, 989 555-1234'),
+('5678', '789 Elm St, Sometown, USA, 989 555-5678'),
+('9876', '321 Oak St, Anycity, USA, 989 555-9876'),
+('1111', '555 First St, Cityville, USA, 989.555.1111'),
+('2222', '222 Second St, Townsville, USA, 989-555-2222'),
+('3333', '333 Third St, Villageton, USA, 989 555 3333'),
+('4444', '444 Fourth St, Hamletown, USA, 989-555-4444'),
+('5555', '555 Fifth St, Countryside, USA, 989.555.5555'),
+('6666', '666 Sixth St, Ruralville, USA, 989 555-6666'),
+('7777', '777 Seventh St, Suburbia, USA, 989-555-7777'),
+('8888', '888 Eighth St, Metropolis, USA, 989.555.8888'),
+('9999', '999 Ninth St, Cityburg, USA, 989-555-9999'),
+('1010', '101 Tenth St, Township, USA, 989 555.1010'),
+('2020', '202 Twelfth St, Villagetown, USA, 989 555-2020'),
+('3030', '303 Thirteenth St, Suburbville, USA, 989-555.3030'),
+('4040', '404 Fourteenth St, Countryburg, USA, 555-4040'),
+('5050', '505 Fifteenth St, Hamletville, USA, 555.5050'),
+('6060', '606 Sixteenth St, Cityton, USA, 989 555-6060'),
+('7070', '707 Seventeenth St, Metrotown, USA, 989-555.7070'),
+('8080', '808 Eighteenth St, Countrypolis, USA, 555-8080'),
+('9090', '909 Nineteenth St, Villageburg, USA, 989-555.9090'),
+('1122', '1122 Twentieth St, Townshipville, USA, 989 555-1122'),
+('2233', '2233 Twenty-First St, Ruralburg, USA, 555.2233'),
+('2020', '202 Twelfth St, Villagetown, USA'),
+('3030', '303 Thirteenth St, Suburbville, USA'),
+('4040', '404 Fourteenth St, Countryburg, USA'),
+('5050', '505 Fifteenth St, Hamletville, USA'),
+('6060', '606 Sixteenth St, Cityton, USA'),
+('7070', '707 Seventeenth St, Metrotown, USA'),
+('8080', '808 Eighteenth St, Countrypolis, USA'),
+('9090', '909 Nineteenth St, Villageburg, USA'),
+('1122', '1122 Twentieth St, Townshipville, USA'),
+('2233', '2233 Twenty-First St, Ruralburg, USA');
+#+end_src
+Lets match only valid phone numbers from it
+valid phone numbers have
+  - 3 starting numbers
+  - 3 middle numbers
+  - 4 ending numbers
+  - The number blocks must be separated by either \s or - or .
+  - The separators must be always the same XXX-XXX-XXXX or XXX.XXX.XXXX for the dial to work properly
+**** Solution
+Lets first do all but the last point
+
+#+begin_src sql
+SELECT comment_text as original,
+REPLACE(regexp_replace(comment_text,'[0-9]{3}[-. ][0-9]{3}[-. ][0-9]{4}', '***'),'***','') as part_to_eliminate,
+REPLACE(comment_text,REPLACE(regexp_replace(comment_text,'[0-9]{3}[-. ][0-9]{3}[-. ][0-9]{4}', '***'),'***',''),'') as replace1
+FROM employee_comment
+where regexp_like(comment_text, '[0-9]{3}[-. ][0-9]{3}[-. ][0-9]{4}')
+#+end_src
+
+RESULT
+| original                                            | part_to_eliminate                      |      replace |
+|-----------------------------------------------------+----------------------------------------+--------------|
+| 126 Varnum, Edmore MI 48829, 989 313-5351           | 126 Varnum, Edmore MI 48829,           | 989 313-5351 |
+| 989-387.5359                                        |                                        | 989-387.5359 |
+| 906-387-1698, 313-535.8886                          | , 313-535.8886                         | 906-387-1698 |
+| 456 Main St, Anytown, USA, 989 555-1234             | 456 Main St, Anytown, USA,             | 989 555-1234 |
+| 789 Elm St, Sometown, USA, 989 555-5678             | 789 Elm St, Sometown, USA,             | 989 555-5678 |
+| 321 Oak St, Anycity, USA, 989 555-9876              | 321 Oak St, Anycity, USA,              | 989 555-9876 |
+| 555 First St, Cityville, USA, 989.555.1111          | 555 First St, Cityville, USA,          | 989.555.1111 |
+| 222 Second St, Townsville, USA, 989-555-2222        | 222 Second St, Townsville, USA,        | 989-555-2222 |
+| 333 Third St, Villageton, USA, 989 555 3333         | 333 Third St, Villageton, USA,         | 989 555 3333 |
+| 444 Fourth St, Hamletown, USA, 989-555-4444         | 444 Fourth St, Hamletown, USA,         | 989-555-4444 |
+| 555 Fifth St, Countryside, USA, 989.555.5555        | 555 Fifth St, Countryside, USA,        | 989.555.5555 |
+| 666 Sixth St, Ruralville, USA, 989 555-6666         | 666 Sixth St, Ruralville, USA,         | 989 555-6666 |
+| 777 Seventh St, Suburbia, USA, 989-555-7777         | 777 Seventh St, Suburbia, USA,         | 989-555-7777 |
+| 888 Eighth St, Metropolis, USA, 989.555.8888        | 888 Eighth St, Metropolis, USA,        | 989.555.8888 |
+| 999 Ninth St, Cityburg, USA, 989-555-9999           | 999 Ninth St, Cityburg, USA,           | 989-555-9999 |
+| 1010 Tenth St, Township, USA, 989 555.1010          | 1010 Tenth St, Township, USA,          | 989 555.1010 |
+| 2020 Twelfth St, Villagetown, USA, 989 555-2020     | 2020 Twelfth St, Villagetown, USA,     | 989 555-2020 |
+| 3030 Thirteenth St, Suburbville, USA, 989-555.3030  | 3030 Thirteenth St, Suburbville, USA,  | 989-555.3030 |
+| 4040 Fourteenth St, Countryburg, USA, 989 555-4040  | 4040 Fourteenth St, Countryburg, USA,  | 989 555-4040 |
+| 5050 Fifteenth St, Hamletville, USA, 989-555.5050   | 5050 Fifteenth St, Hamletville, USA,   | 989-555.5050 |
+| 6060 Sixteenth St, Cityton, USA, 989 555-6060       | 6060 Sixteenth St, Cityton, USA,       | 989 555-6060 |
+| 7070 Seventeenth St, Metrotown, USA, 989-555.7070   | 7070 Seventeenth St, Metrotown, USA,   | 989-555.7070 |
+| 8080 Eighteenth St, Countrypolis, USA, 989 555-8080 | 8080 Eighteenth St, Countrypolis, USA, | 989 555-8080 |
+| 9090 Nineteenth St, Villageburg, USA, 989-555.9090  | 9090 Nineteenth St, Villageburg, USA,  | 989-555.9090 |
+| 1122 Twentieth St, Townshipville, USA, 989 555-1122 | 1122 Twentieth St, Townshipville, USA, | 989 555-1122 |
+| 2233 Twenty-First St, Ruralburg, USA, 989-555.2233  | 2233 Twenty-First St, Ruralburg, USA,  | 989-555.2233 |
+
+this solution works and uses the same approach we used to separate the numbers from the characters, but there is a better way using regexp_substr() this function extracts only matching characters from a text
+
+#+begin_src sql
+SELECT comment_text as original,
+REPLACE(regexp_replace(comment_text,'[0-9]{3}[-. ][0-9]{3}[-. ][0-9]{4}', '***'),'***','') as part_to_eliminate,
+-- this functions substracts only the matching
+regexp_substr(comment_text, '[0-9]{3}[-. ][0-9]{3}[-. ][0-9]{4}') as phone_number,
+FROM employee_comment
+where regexp_like(comment_text, '[0-9]{3}[-. ][0-9]{3}[-. ][0-9]{4}')
+#+end_src
+
+Now lets add the last part, the correct formating, you cannot mix points, slashes and spaces. To do that lets select only one possibility
+#+begin_src sql
+SELECT comment_text as original,
+REPLACE(regexp_replace(comment_text,'[0-9]{3}[-. ][0-9]{3}[-. ][0-9]{4}', '***'),'***','') as part_to_eliminate,
+regexp_substr(comment_text, '[0-9]{3}[-. ][0-9]{3}[-. ][0-9]{4}') as phone_number,
+regexp_replace(
+    regexp_substr(comment_text, '[0-9]{3}[-. ][0-9]{3}[-. ][0-9]{4}'),
+	-- () creates groups that later can be called using numbers
+    '([0-9]{3})([-. ])([0-9]{3})([-. ])([0-9]{4})',
+    -- this groups are called using \1, adding - as separator
+	'\1-\3-\5'
+  ) AS correctx_formated_number
+FROM employee_comment
+where regexp_like(comment_text, '[0-9]{3}[-. ][0-9]{3}[-. ][0-9]{4}')
+#+end_src
+
+This is the perfect solution, the magic is in the (), this parenthesis form GROUPs, groups that can be called using their position, we add '-' to separate those groups, this can also be changed to ' ' or '.'
+
+| original                                            | part_to_eliminate                      | phone_number | correctx_formated_number |
+|-----------------------------------------------------+----------------------------------------+--------------+--------------------------|
+| 126 Varnum, Edmore MI 48829, 989 313-5351           | 126 Varnum, Edmore MI 48829,           | 989 313-5351 |             989-313-5351 |
+| 989-387.5359                                        |                                        | 989-387-5359 |             989-387-5359 |
+| 906-387-1698, 313-535.8886                          | , 313-535.8886                         | 906-387-1698 |             906-387-1698 |
+| 456 Main St, Anytown, USA, 989 555-1234             | 456 Main St, Anytown, USA,             | 989 555-1234 |             989-555-1234 |
+| 789 Elm St, Sometown, USA, 989 555-5678             | 789 Elm St, Sometown, USA,             | 989 555-5678 |             989-555-5678 |
+| 321 Oak St, Anycity, USA, 989 555-9876              | 321 Oak St, Anycity, USA,              | 989 555-9876 |             989-555-9876 |
+| 555 First St, Cityville, USA, 989.555.1111          | 555 First St, Cityville, USA,          | 989.555.1111 |             989-555-1111 |
+| 222 Second St, Townsville, USA, 989-555-2222        | 222 Second St, Townsville, USA,        | 989-555-2222 |             989-555-2222 |
+| 333 Third St, Villageton, USA, 989 555 3333         | 333 Third St, Villageton, USA,         | 989 555 3333 |             989-555-3333 |
+| 444 Fourth St, Hamletown, USA, 989-555-4444         | 444 Fourth St, Hamletown, USA,         | 989-555-4444 |             989-555-4444 |
+| 555 Fifth St, Countryside, USA, 989.555.5555        | 555 Fifth St, Countryside, USA,        | 989.555.5555 |             989-555-5555 |
+| 666 Sixth St, Ruralville, USA, 989 555-6666         | 666 Sixth St, Ruralville, USA,         | 989 555-6666 |             989-555-6666 |
+| 777 Seventh St, Suburbia, USA, 989-555-7777         | 777 Seventh St, Suburbia, USA,         | 989-555-7777 |             989-555-7777 |
+| 888 Eighth St, Metropolis, USA, 989.555.8888        | 888 Eighth St, Metropolis, USA,        | 989.555.8888 |             989-555-8888 |
+| 999 Ninth St, Cityburg, USA, 989-555-9999           | 999 Ninth St, Cityburg, USA,           | 989-555-9999 |             989-555-9999 |
+| 101 Tenth St, Township, USA, 989 555.1010           | 101 Tenth St, Township, USA,           | 989 555.1010 |             989-555-1010 |
+| 202 Twelfth St, Villagetown, USA, 989 555-2020      | 202 Twelfth St, Villagetown, USA,      | 989 555-2020 |             989-555-2020 |
+| 303 Thirteenth St, Suburbville, USA, 989-555.3030   | 303 Thirteenth St, Suburbville, USA,   | 989-555.3030 |             989-555-3030 |
+| 404 Fourteenth St, Countryburg, USA, 989 555-4040   | 404 Fourteenth St, Countryburg, USA,   | 989 555-4040 |             989-555-4040 |
+| 505 Fifteenth St, Hamletville, USA, 989-555.5050    | 505 Fifteenth St, Hamletville, USA,    | 989-555.5050 |             989-555-5050 |
+| 606 Sixteenth St, Cityton, USA, 989 555-6060        | 606 Sixteenth St, Cityton, USA,        | 989 555-6060 |             989-555-6060 |
+| 707 Seventeenth St, Metrotown, USA, 989-555.7070    | 707 Seventeenth St, Metrotown, USA,    | 989-555.7070 |             989-555-7070 |
+| 808 Eighteenth St, Countrypolis, USA, 989 555-8080  | 808 Eighteenth St, Countrypolis, USA,  | 989 555-8080 |             989-555-8080 |
+| 909 Nineteenth St, Villageburg, USA, 989-555.9090   | 909 Nineteenth St, Villageburg, USA,   | 989-555.9090 |             989-555-9090 |
+| 1122 Twentieth St, Townshipville, USA, 989 555-1122 | 1122 Twentieth St, Townshipville, USA, | 989 555-1122 |             989-555-1122 |
+| 2233 Twenty-First St, Ruralburg, USA, 989-555.2233  | 2233 Twenty-First St, Ruralburg, USA,  | 989-555.2233 |             989-555-2233 |

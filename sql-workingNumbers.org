@@ -1,0 +1,264 @@
+#+title: Sql Working With Numbers
+
+* Computing an Average/Min/Max
+#+begin_src sql
+SELECT avg(sal), max(sal), min(sal)
+FROM emp
+#+end_src
+
+Result
+|                 "avg" | "max" | "min" |
+| 2073.2142857142857143 |  5000 |   800 |
+
+
+Using a GROUP BY clause
+#+begin_src sql
+SELECT deptno,avg(sal), max(sal), min(sal)
+FROM emp
+group by deptno
+#+end_src
+
+Result
+| deptno |                   avg |  max |  min |
+|     30 | 1566.6666666666666667 | 2850 |  950 |
+|     10 | 2916.6666666666666667 | 5000 | 1300 |
+|     20 | 2175.0000000000000000 | 3000 |  800 |
+
+* Sum() and sum over
+The SUM(col_name) sums all the values on that column. Be careful with NULL values,
+if there even one null the total result will be NULL
+
+An interesting application of the SUM() function comes with the use of OVER,
+in this case to create a **Running Total**
+#+begin_src sql
+select ename, sal, sum(sal) over (order by sal,empno) as running_total
+FROM emp
+#+end_src
+Result
+| ename   | sal  | running_total |
+|---------+------+---------------|
+| SMITH   | 800  | 800           |
+| JAMES   | 950  | 1750          |
+| ADAMS   | 1100 | 2850          |
+| WARD    | 1250 | 4100          |
+| MARTIN  | 1250 | 5350          |
+| MILLER  | 1300 | 6650          |
+| TURNER  | 1500 | 8150          |
+| ALLEN   | 1600 | 9750          |
+| CLARK   | 2450 | 12200         |
+| BLAKE   | 2850 | 15050         |
+| JONES   | 2975 | 18025         |
+| SCOTT   | 3000 | 21025         |
+| FORD    | 3000 | 24025         |
+| KING    | 5000 | 29025         |
+
+The OVER() clause in SQL is used with window functions to perform calculations across a specified
+range of rows related to the current row.
+
+#+begin_quote
+look at the (order by sal,empno), why the use of empno? this is important, because some SAL might be duplicated, like the case of WARD and MARTIN, if you ommit empno, ORDER BY will return two 1250 and add them to the sum. EMPNO is unique
+#+end_quote
+
+** Generating a Running Product
+The idea is the same that before but, using the product. Unfortunately there is not a SQL function for multiplication. **Use of logarithms:** the multiplication in logarithms is the SUM, and to get back to base 10
+you only need to elevate to the power of the base
+ + 2 = e**ln(2)
+
+Example
+
+#+begin_src sql
+select empno,ename,sal,
+exp(sum(ln(sal)) over (order by sal,empno)) as running_prod
+from emp
+where deptno = 10
+#+end_src
+
+Result
+| empno | ename  |  sal |       running_prod |
+|  7934 | MILLER | 1300 |               1300 |
+|  7782 | CLARK  | 2450 | 3184999.9999999963 |
+|  7839 | KING   | 5000 | 15925000000.000023 |
+
+* The Lag() function
+
+The lag function SLIDES the table i rows
+- LAG(col_name, i)
+
+This can be used to generate a SMOOTHER
+** Moving Average
+Is a smoothing technique that uses the AVG of an X amount of preceeding points
+A moving average can be calculated by summing the current value and the preceding
+n-1 values and dividing by n.
+
+You know that there is volatility to the sales data that makes it difficult to
+discern an underlying trend. Possibly different days of the week or month are known to have especially high or low sales. Alternatively, maybe you are aware that due to the way the data is collected, sometimes sales for one day are moved into the next day, creating a trough followed by a peak.
+Example using LAG
+|      DATE1 | sales | salesLagOne | SalesLagTwo | MovingAverage |
+|------------+-------+-------------+-------------+---------------|
+| 2020-01-01 |   647 |        NULL |        NULL |          NULL |
+| 2020-01-02 |   561 |         647 |        NULL |          NULL |
+| 2020-01-03 |   741 |         561 |         647 |       649.667 |
+| 2020-01-04 |   978 |         741 |         561 |           760 |
+| 2020-01-05 |  1062 |         978 |         741 |           927 |
+| 2020-01-06 |  1072 |        1062 |         978 |      1037.333 |
+| 2020-01-07 |   805 |        1072 |        1062 |       979.667 |
+| 2020-01-08 |   662 |         805 |        1072 |       846.333 |
+| 2020-01-09 |  1083 |         662 |         805 |           850 |
+| 2020-01-10 |   970 |        1083 |         662 |           905 |
+
+#+begin_src sql
+select date1, sales,lag(sales,1) over(order by date1) as salesLagOne,
+lag(sales,2) over(order by date1) as salesLagTwo,
+-- Moving AVG of x + x-1 + x-2
+(sales+ (lag(sales,1) over(order by date1)) + lag(sales,2) over(order by date1))
+/3 as MovingAverage
+from sales
+#+end_src
+**Result**
+|      date1 | sales | salesLagOne | salesLagTwo |      movingAverage |
+|------------+-------+-------------+-------------+--------------------|
+| 2020-01-01 |   647 |             |             |                    |
+| 2020-01-02 |   561 |         647 |             |                    |
+| 2020-01-03 |   741 |         561 |         647 |  649.6666666666666 |
+| 2020-01-04 |   978 |         741 |         561 |                760 |
+| 2020-01-05 |  1062 |         978 |         741 |                927 |
+| 2020-01-06 |  1072 |        1062 |         978 | 1037.3333333333333 |
+| 2020-01-07 |  1200 |        1072 |        1062 | 1111.3333333333333 |
+| 2020-01-08 |  1350 |        1200 |        1072 | 1207.3333333333333 |
+| 2020-01-09 |   647 |        1350 |        1200 | 1065.6666666666667 |
+| 2020-01-10 |  1500 |         647 |        1350 | 1165.6666666666667 |
+| 2020-01-11 |    50 |        1500 |         647 |  732.3333333333334 |
+| 2020-01-12 |   561 |          50 |        1500 |  703.6666666666666 |
+
+* DENSE_RANK()
+The DENSE_RANK() function doesn't count how many times a value appears. Instead, it assigns a rank to each distinct value in the ordered result set, without leaving gaps in the ranking. Example Table
+| id | value |
+|----+-------|
+|  1 |    10 |
+|  2 |    20 |
+|  3 |  NULL |
+|  4 |    30 |
+|  5 |  NULL |
+
+#+begin_src sql
+SELECT
+  id,
+  value,
+  DENSE_RANK() OVER (ORDER BY value) AS dense_rank
+FROM
+  example_table
+#+end_src
+
+| id |  value | dense_rank |
+|----+--------+------------|
+|  1 |     10 |          2 |
+|  3 | (NULL) |          1 |
+|  2 |     20 |          3 |
+|  4 |     30 |          4 |
+|  5 | (NULL) |          1 |
++ There is no gap in the ranking for NULL values
++ No NULL values receive distinct RANKS
+
+Example 2
+| id | value | dense_rank |
+|----+-------+------------|
+|  1 |    10 |          1 |
+|  3 |    10 |          1 |
+|  2 |    20 |          2 |
+|  4 |    30 |          3 |
+
++ 10 receives RANK 1
+
+Now that you understand the DENSE_RANK() function you can use it to
+
+* PERCENTILE_CONT()
+the median is the value of the middle member of a set of ordered elements.
++ Percentile q: the value below which a given percentage of the data falls. q = 50%, 50% of the data has a value equal or lower than X
+
+The mean, on the other hand, is the average of all the values in a dataset. It is calculated by summing up all the values and dividing by the number of values.
+
+
+#+begin_src sql
+SELECT percentile_cont(0.5)
+-- this is just an order by but in percentile syntax
+WITHIN GROUP (ORDER BY sal)
+-- OVER() indicates that the window frame includes the entire result set without any partitioning.
+-- is needed on MSSQL but no in PostgreSql
+OVER ()
+FROM emp WHERE deptno = 20;
+#+end_src
+
+* Determining the Percentage of a Total
+You want to determine the percentage that values in a specific column represent against a total. For example, you want to determine what percentage of all salaries are the salaries in DEPTNO 10
+
+** Use of CASE WHEN ... THEN .. END
+#+begin_src sql
+SELECT SUM(CASE WHEN deptno = 30 then sal else 0 end) as partial_ ,
+SUM(sal) total_,
+CAST(SUM(CASE WHEN deptno = 30 then sal else 0 end) as float)/ SUM(sal) * 100 as pct
+FROM emp
+#+end_src
+RESULT
+| partial_ | total_ |               pct |
+|----------+--------+-------------------|
+|     9400 |  29025 | 32.38587424633936 |
+
+
+
+
+* Common Table Expressions (WITH)
+#+begin_quote
+Common Table Expression (CTE)
+CTEs are essentially temporary result sets that you can reference within the context of a larger query.
+#+end_quote
+
+The full syntax for a CTE is as follows:
+
+#+begin_src sql
+WITH cte_name (column_name1, column_name2, ...) AS (
+    -- CTE query goes here
+    SELECT column1, column2, ...
+    FROM your_table
+    WHERE your_conditions
+)
+SELECT * FROM cte_name;
+
+#+end_src
+
++ **WITH cte_name (column_name1, column_name2, ...) AS**  This is the start of the CTE definition.
+  cte_name is the name you assign to the CTE, and column_name1, column_name2, ... are optional column
+  aliases that you can use to rename the columns in the result set
+
+
+
+* Table Variable (@)
+The @ is used to create variables in SQL, you can use it to create a @TableVariable, which you can later reference or use in joins, etc
+
+#+begin_src sql
+-- Table variable
+DECLARE @TableVariable TABLE (
+    column1 datatype,
+    column2 datatype
+);
+
+INSERT INTO @TableVariable
+SELECT column1, column2
+FROM YourTable
+WHERE YourConditions;
+
+SELECT * FROM @TableVariable;
+#+end_src
+
+** Which is the difference between @TableVariable and CTE
+CTEs are part of a single query and are not physically stored, while temporary tables or table variables are physical storage objects that persist for a specific duration.
+with median_ (median)
+as
+(select percentile_cont(0.5) within group(order by sal)
+from emp),
+
+devtab (deviation)
+as
+(select abs(sal-median_.median)
+from emp cross join median_)
+
+SELECT * from devtab

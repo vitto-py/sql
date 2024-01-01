@@ -1,0 +1,55 @@
+#+title: Org Tuto
+
+
+* Create a new Editor
+let me write something in here nothing special
+** Create a second level
+* A new element
+** a scond level for it
+** ctrl + return creates a element of the same type
+1. This is a ordered list
+2. with 2 elements
+   + This is an unordered list
+     + This is also one
+       - Use Shift + tab and tab inside i mode to toggle up/down a level
+* Snippets
+this is another line
+ESC + o to create a new line
+#+begin_quote
+This is a quote, I inserted it using spc+i+s => select your snippet
+#+end_quote
+Do you want to insert the current date? spc+i+s => (current time)
+Thu Dec 21 17:21:40 2023
+src_python[:exports code]{code}
+* To Do spc+m+t
+** TODO this is sth to do
+** HOLD Another task
+** DONE third task
+* Org Schedule
+SCHEDULED: <2024-01-18 Thu 16:00-18:00>
+This runs a calendar spc m d s from where you can select dates
+insert 16:00-18:00 and double click on a date
+** insert checkbox [1/4] [25%]
+just write [] with an / inside and the counter automatically begins
+the same with the %
+- [ ] egg
+- [-] milk
+- [X] just type this 3 elements and it is render as a ToDo list
+- [ ] use enter in the [] and it toggles the status
+* Agenda
+this was not very well explained
+
+* Tables
+like in markdown use pipes |
+| This is a new col | Header 1                | header 2             | and so on               | control RET |
+|-------------------+-------------------------+----------------------+-------------------------+-------------|
+| ttt               | tab / s+tab to navigate | tab auto adjust size | enter erase the content | asdasdasd   |
+|                   |                         | tab auto adjust size |                         |             |
+|                   |                         | shift RET duplicates | what is above           |             |
+|                   | spc m b -               | creates header       |                         |             |
+| alt shift j       | creates up rows         |                      |                         |             |
+| ctr RET creates   | new rows but only down  |                      |                         |             |
+this is a table
+1. alt shift j = new row
+2. alt shift k = deletes rows
+3. alt shift l = new colunm
